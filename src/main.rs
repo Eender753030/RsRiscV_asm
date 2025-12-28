@@ -16,10 +16,19 @@ fn main() {
                     Err(e) => {
                         match e {
                             AsmRiscVError::ParseEmptyLine => continue,
-                            _ => eprintln!("{:?}", e)
+                            _ => {
+                                eprintln!("{:?}", e);
+                                std::process::exit(1);
+                            }
                         }
                     }
                 }
+            }
+
+            let binary_contents = assembler::assembly(&instructions);
+            println!("{:x?}", binary_contents);
+            if let Err(e) = file::write_binary("test", &binary_contents) {
+                eprintln!("{:?}", e);
             }
         },
 
@@ -27,10 +36,4 @@ fn main() {
             eprintln!("{:?}", e);
         }
     } 
-
-    let binary_contents = assembler::assembly(&instructions);
-    println!("{:x?}", binary_contents);
-    if let Err(e) = file::write_binary("test", &binary_contents) {
-        eprintln!("{:?}", e);
-    }
 }

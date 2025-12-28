@@ -2,27 +2,34 @@ use super::instruction::Instruction;
 use crate::utils::exception::AsmRiscVError;
 
 pub fn parse_instruction(line: &str) -> Result<Instruction, AsmRiscVError> {
-    if line.trim().is_empty() {
+    let clean_line = line.trim();
+    
+    if clean_line.is_empty() {
         return Err(AsmRiscVError::ParseEmptyLine);
     }
 
     let valid_line;
 
-    if let Some(comment) = line.find('#') {
-        valid_line = line[..comment].to_lowercase();
-        if valid_line.trim().is_empty() {
+    if let Some(comment) = clean_line.find('#') {
+        valid_line = clean_line[..comment].to_lowercase();
+        if valid_line.is_empty() {
             return Err(AsmRiscVError::ParseEmptyLine);
         }
     } else {
         valid_line = line.to_lowercase();
     }
 
-    let mut tokens = valid_line.split_whitespace();
-    
-    let opcode = match tokens.next() {
-        Some(code) => code,
+    let opcode;
+    let last_str;
+    match valid_line.split_once(' ') {
+        Some((left, right)) => {
+            opcode = left;
+            last_str = right;
+        },
         None => return Err(AsmRiscVError::SyntaxError)
     };
+
+    let mut tokens = last_str.split(',');
 
     match opcode {
         "addi" => {
@@ -47,11 +54,11 @@ fn parse_register(reg_token: Option<&str>) -> Result<u32, AsmRiscVError> {
         None => return Err(AsmRiscVError::SyntaxError)
     };
 
-    if !reg_str.starts_with('x') || !reg_str.ends_with(',') {
+    if !reg_str.starts_with('x') {
         return Err(AsmRiscVError::SyntaxError);
     }
    
-    match reg_str[1..].trim_matches(',').parse::<u32>() {
+    match reg_str[1..].trim().parse::<u32>() {
         Ok(reg) => {
             if reg > 31 {
                 Err(AsmRiscVError::NotExistRegister)
