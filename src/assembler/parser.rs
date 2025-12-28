@@ -19,11 +19,11 @@ pub fn parse_instruction(line: &str) -> Result<Instruction, AsmRiscVError> {
         valid_line = line.to_lowercase();
     }
 
-    let opcode;
+    let op_str;
     let last_str;
     match valid_line.split_once(' ') {
         Some((left, right)) => {
-            opcode = left;
+            op_str = left;
             last_str = right;
         },
         None => return Err(AsmRiscVError::SyntaxError)
@@ -31,7 +31,7 @@ pub fn parse_instruction(line: &str) -> Result<Instruction, AsmRiscVError> {
 
     let mut tokens = last_str.split(',');
 
-    match opcode {
+    match op_str {
         "addi" => {
             Ok(Instruction::Itype {
                 rd: parse_register(tokens.next())?,
@@ -54,11 +54,13 @@ fn parse_register(reg_token: Option<&str>) -> Result<u32, AsmRiscVError> {
         None => return Err(AsmRiscVError::SyntaxError)
     };
 
-    if !reg_str.starts_with('x') {
+    let clean_reg_str = reg_str.trim();
+
+    if !clean_reg_str.starts_with('x') {
         return Err(AsmRiscVError::SyntaxError);
     }
    
-    match reg_str[1..].trim().parse::<u32>() {
+    match clean_reg_str[1..].parse::<u32>() {
         Ok(reg) => {
             if reg > 31 {
                 Err(AsmRiscVError::NotExistRegister)
