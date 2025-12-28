@@ -30,7 +30,7 @@ pub fn parse_instruction(line: &str) -> Result<Instruction, AsmRiscVError> {
     };
 
     let mut tokens = last_str.split(',');
-
+    
     match op_str {
         "addi" => {
             Ok(Instruction::Itype {
@@ -39,6 +39,21 @@ pub fn parse_instruction(line: &str) -> Result<Instruction, AsmRiscVError> {
                 imm: parse_immediate(tokens.next())?,
                 opcode: 0b0010011, 
                 funct3: 000
+            })
+        },
+
+        "add" | "sub" => {
+            Ok(Instruction::Rtype {
+                rd: parse_register(tokens.next())?,
+                rs1: parse_register(tokens.next())?,
+                rs2: parse_register(tokens.next())?,
+                opcode: 0b0010011, 
+                funct3: 0b000,
+                funct7: match op_str {
+                    "add" => 0b0000000,
+                    "sub" => 0b0100000,
+                    _ => 0
+                }
             })
         }
 
@@ -78,7 +93,7 @@ fn parse_immediate(imm_token: Option<&str>) -> Result<i32, AsmRiscVError> {
         None => return Err(AsmRiscVError::SyntaxError)
     };
 
-    match imm_str.parse::<i32>() {
+    match imm_str.trim().parse::<i32>() {
         Ok(imm) => {
             if imm > 2047 || imm < -2048 {
                 Err(AsmRiscVError::ImmediateOverflow)
