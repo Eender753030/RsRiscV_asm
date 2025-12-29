@@ -16,4 +16,7 @@ pub enum AsmRiscVError {
 
     #[error("")]
     ImmediateOverflow,
+
+    #[error("")]
+    ParseFunctError,
 }
