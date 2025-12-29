@@ -18,6 +18,11 @@ pub fn assembly(instructions: &Vec<Instruction>) -> Vec<u8>{
                 let ins_u32 = (funct7 << 25) | (rs2 << 20) | (rs1 << 15) | (funct3 << 12) | (rd << 7) | opcode;
                 binary_contents.extend_from_slice(&ins_u32.to_le_bytes());
             }
+
+            Instruction::Stype {rs1, rs2, imm, opcode, funct3} => {
+                let ins_u32 = (((imm & 0xfe0) << 25) as u32) | (rs2 << 20) | (rs1 << 15) | (funct3 << 12) | (((imm & 0x1f) << 7) as u32) | opcode;
+                binary_contents.extend_from_slice(&ins_u32.to_le_bytes());
+            }
         }
     }
 
