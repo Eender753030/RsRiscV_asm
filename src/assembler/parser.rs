@@ -95,6 +95,39 @@ pub fn parse_instruction(line: &str) -> Result<Instruction, AsmRiscVError> {
             })
         }
 
+        "lb" | "lh" | "lw" | 
+        "lbu" | "lhu" => {
+            let rd = parse_register(tokens.next())?;
+            let (imm, rs1) = parse_ld_or_sd(tokens.next())?;
+            Ok(Instruction::Itype {
+                rd,
+                rs1,
+                imm,
+                opcode: 0b0000011, 
+                funct3: match op_str {
+                    "lb" => 0b000,
+                    "lh" => 0b001,
+                    "lw" => 0b010,
+                    "lbu" => 0b100,
+                    "lhu" => 0b101,
+                    _ => return Err(AsmRiscVError::ParseFunctError)
+                }
+            })
+        },
+
+        "sb" | "sh" | "sw" => {
+            let rs2 = parse_register(tokens.next())?;
+            let (imm, rs1) = parse_ld_or_sd(tokens.next())?;
+            Ok(Instruction::Stype {
+                rs2,
+                rs1,
+                imm,
+                opcode: 0b0100011, 
+                funct3: match op_str {
+                    "sb" => 0b000,
+                    "sh" => 0b001,
+                    "sw" => 0b010,
+                    _ => return Err(AsmRiscVError::ParseFunctError)
                 }
             })
         }
@@ -131,18 +164,47 @@ fn parse_register(reg_token: Option<&str>) -> Result<u32, AsmRiscVError> {
 
 fn parse_immediate(imm_token: Option<&str>) -> Result<i32, AsmRiscVError> {
     let imm_str = match imm_token {
+fn parse_ld_or_sd(token: Option<&str>) -> Result<(i32, u32), AsmRiscVError> {
+    let token_str = match token {
         Some(str) => str,
         None => return Err(AsmRiscVError::SyntaxError)
     };
 
-    match imm_str.trim().parse::<i32>() {
+    let imm_str;
+    let reg_str;
+
+    match token_str.split_once('(') {
+        Some((left, right)) => {
+            imm_str = left.trim();
+            let clean_right = right.trim();
+            if !clean_right.starts_with('x') || !clean_right.ends_with(')') {
+                return Err(AsmRiscVError::SyntaxError);
+            }
+
+            reg_str = clean_right.trim_end_matches(')').trim();
+        },
+
+        None => return Err(AsmRiscVError::SyntaxError)
+    }
+
+    
+    Ok((match imm_str.trim().parse::<i32>() {
         Ok(imm) => {
             if imm > 2047 || imm < -2048 {
-                Err(AsmRiscVError::ImmediateOverflow)
+                return Err(AsmRiscVError::ImmediateOverflow);
             } else {
-                Ok(imm)
+                imm
             }
-        }
-        Err(_) => Err(AsmRiscVError::SyntaxError)
-    }
+        },
+        Err(_) => return Err(AsmRiscVError::SyntaxError)
+    }, match reg_str[1..].parse::<u32>() {
+        Ok(reg) => {
+            if reg > 31 {
+                return Err(AsmRiscVError::NotExistRegister);
+            } else {
+                reg
+            }
+        },
+        Err(_) => return Err(AsmRiscVError::SyntaxError)
+    }))
 }
