@@ -89,17 +89,17 @@ pub fn parse_instruction(line: &str) -> Result<Instruction, AsmRiscVError> {
                 rd: parse_register(tokens.next())?,
                 rs1: parse_register(tokens.next())?,
                 rs2: parse_register(tokens.next())?,
-                opcode: match op_str {
-                    "sll | srl" => 0b0000000,
-                    "sra" => 0b0100000,
-                    _ => return Err(AsmRiscVError::ParseFunctError)
-                }, 
+                opcode: 0b0110011,
                 funct3: match op_str {
                     "sll" => 0b001,
                     "srl" | "sra" => 0b101,
                     _ => return Err(AsmRiscVError::ParseFunctError)
                 },
-                funct7: 0b0000000
+                funct7: match op_str {
+                    "sll" | "srl" => 0b0000000,
+                    "sra" => 0b0100000,
+                    _ => return Err(AsmRiscVError::ParseFunctError)
+                }, 
             })
         }
 
