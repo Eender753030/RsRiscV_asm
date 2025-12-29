@@ -140,17 +140,15 @@ pub fn parse_instruction(line: &str) -> Result<Instruction, AsmRiscVError> {
 
 fn parse_register(reg_token: Option<&str>) -> Result<u32, AsmRiscVError> {
     let reg_str = match reg_token {
-        Some(str) => str,
+        Some(str) => str.trim(),
         None => return Err(AsmRiscVError::SyntaxError)
     };
 
-    let clean_reg_str = reg_str.trim();
-
-    if !clean_reg_str.starts_with('x') {
+    if !reg_str.starts_with('x') {
         return Err(AsmRiscVError::SyntaxError);
     }
    
-    match clean_reg_str[1..].parse::<u32>() {
+    match reg_str[1..].parse::<u32>() {
         Ok(reg) => {
             if reg > 31 {
                 Err(AsmRiscVError::NotExistRegister)
@@ -162,8 +160,39 @@ fn parse_register(reg_token: Option<&str>) -> Result<u32, AsmRiscVError> {
     }
 }
 
-fn parse_immediate(imm_token: Option<&str>) -> Result<i32, AsmRiscVError> {
+fn parse_immediate(imm_token: Option<&str>, with_funct: bool) -> Result<i32, AsmRiscVError> {
     let imm_str = match imm_token {
+        Some(str) => str.trim(),
+        None => return Err(AsmRiscVError::SyntaxError)
+    };
+
+    let base = match imm_str.as_bytes() {
+        [b'0', b'x', ..] => 16,
+        [b'0', b'b', ..] => 2,
+        [b'0', b'o', ..] => 8,
+        _ => 10,
+    };
+    
+    let imm = if base != 10 {
+        match u32::from_str_radix(&imm_str[2..], base) {
+            Ok(raw) => (raw as i32) << 20 >> 20,          
+            Err(_) => return Err(AsmRiscVError::SyntaxError)
+        }
+    } else {
+        match imm_str.trim().parse::<i32>() {
+            Ok(imm) => imm,
+            Err(_) => return Err(AsmRiscVError::SyntaxError)
+        }
+    };
+
+    if (with_funct && (imm > 31 || imm < 0)) || 
+        (imm > 2047 || imm < -2048) {
+        Err(AsmRiscVError::ImmediateOverflow)
+    } else {
+        Ok(imm)
+    }
+}
+
 fn parse_ld_or_sd(token: Option<&str>) -> Result<(i32, u32), AsmRiscVError> {
     let token_str = match token {
         Some(str) => str,
