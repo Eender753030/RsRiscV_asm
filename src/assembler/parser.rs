@@ -32,13 +32,40 @@ pub fn parse_instruction(line: &str) -> Result<Instruction, AsmRiscVError> {
     let mut tokens = last_str.split(',');
     
     match op_str {
-        "addi" => {
+        "addi" | "slti" | "sltiu" | 
+        "xori" | "ori" | "andi" => {
             Ok(Instruction::Itype {
                 rd: parse_register(tokens.next())?,
                 rs1: parse_register(tokens.next())?,
-                imm: parse_immediate(tokens.next())?,
+                imm: parse_immediate(tokens.next(), false)?,
                 opcode: 0b0010011, 
-                funct3: 000
+                funct3: match op_str {
+                    "addi" => 0b000,
+                    "slti" => 0b010,
+                    "sltiu" => 0b011,
+                    "xori" => 0b100,
+                    "ori" => 0b110,
+                    "andi" => 0b111, 
+                    _ => return Err(AsmRiscVError::ParseFunctError)
+                }
+            })
+        },
+
+        "slli" | "srli" | "srai" => {
+            Ok(Instruction::Itype {
+                rd: parse_register(tokens.next())?,
+                rs1: parse_register(tokens.next())?,
+                imm: (match op_str {
+                    "slli" | "srli" => 0b000000,
+                    "srai" => 0b0100000,
+                    _ => return Err(AsmRiscVError::ParseFunctError)
+                } << 5) | (parse_immediate(tokens.next(), true)?),
+                opcode: 0b0010011, 
+                funct3: match op_str {
+                    "slli" => 0b001,
+                    "srli" | "srai" => 0b101,
+                    _ => return Err(AsmRiscVError::ParseFunctError)
+                }
             })
         },
 
