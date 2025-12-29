@@ -11,7 +11,7 @@ pub fn read_asm(filename: &str) -> io::Result<String> {
 
     match filepath.extension() {
         Some(ext) => {
-            if ext == "asm"{
+            if ext == "asm" || ext == "s" {
                 fs::read_to_string(filepath)
             } else {
                 return Err(io::Error::new(io::ErrorKind::NotFound, ""))
