@@ -212,8 +212,7 @@ fn parse_immediate(imm_token: Option<&str>, with_funct: bool) -> Result<i32, Asm
         }
     };
 
-    if (with_funct && (imm > 31 || imm < 0)) || 
-        (imm > 2047 || imm < -2048) {
+    if with_funct && !(0..=31).contains(&imm) || !(-2048..=2047).contains(&imm) {
         Err(AsmRiscVError::ImmediateOverflow)
     } else {
         Ok(imm)
@@ -246,7 +245,7 @@ fn parse_ld_or_sd(token: Option<&str>) -> Result<(i32, u32), AsmRiscVError> {
     
     Ok((match imm_str.trim().parse::<i32>() {
         Ok(imm) => {
-            if imm > 2047 || imm < -2048 {
+            if !(-2048..=2047).contains(&imm) {
                 return Err(AsmRiscVError::ImmediateOverflow);
             } else {
                 imm

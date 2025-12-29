@@ -14,7 +14,7 @@ pub fn read_asm(filename: &str) -> io::Result<String> {
             if ext == "asm" || ext == "s" {
                 fs::read_to_string(filepath)
             } else {
-                return Err(io::Error::new(io::ErrorKind::NotFound, ""))
+                Err(io::Error::new(io::ErrorKind::NotFound, ""))
             }
         },
         
@@ -24,8 +24,12 @@ pub fn read_asm(filename: &str) -> io::Result<String> {
     } 
 }
 
-pub fn write_binary(filename: &str, binary_contents: &Vec<u8>) -> io::Result<()> {
-    let file = fs::File::create(filename)?;
+pub fn write_binary(filename: &str, binary_contents: &[u8]) -> io::Result<()> {
+    let filepath = Path::new(filename);
+    
+    // This function only execute when filename is valid. 
+    // So here unwrap is safe
+    let file = fs::File::create(filepath.file_stem().unwrap())?;
 
     let mut writer = io::BufWriter::new(file);
 
