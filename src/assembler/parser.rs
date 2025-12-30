@@ -33,7 +33,7 @@ pub fn parse_label(line: &str, table: &mut HashMap<String, i32>, ins_line_num: u
             }
             if table.contains_key(clean_label) {
                 return Err(AsmRiscVError::UsedLabel);
-    }
+            }
             table.insert(clean_label.to_string(), ins_line_num as i32);
             Ok(())
         },
@@ -195,6 +195,34 @@ pub fn parse_instruction(line: &str, table: &HashMap<String, i32>, ins_count: us
                     "sw" => 0b010,
                     _ => return Err(AsmRiscVError::ParseFunctError)
                 }
+            })
+        }
+
+        "beq" | "bne" | 
+        "blt" | "bge" | 
+        "bltu" | "bgeu" => {
+            Ok(Instruction::Btype { 
+                rs1: parse_register(tokens.next())?, 
+                rs2: parse_register(tokens.next())?, 
+                imm: parse_label_imm(tokens.next(), table, ins_count)?, 
+                opcode: 0b1100011, 
+                funct3: match op_str {
+                    "beq" => 0b000,
+                    "bne" => 0b001,
+                    "blt" => 0b100,
+                    "bge" => 0b101,
+                    "bltu" => 0b110,
+                    "bgeu" => 0b111,
+                    _ => return Err(AsmRiscVError::ParseFunctError)
+                }
+            })
+        }
+ 
+        "jal" => {
+            Ok(Instruction::Jtype {
+                rd: parse_register(tokens.next())?,
+                imm: parse_label_imm(tokens.next(), table, ins_count)?, 
+                opcode: 0b1101111 
             })
         }
 

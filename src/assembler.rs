@@ -29,7 +29,7 @@ pub fn assembly(instructions: &Vec<Instruction>) -> Vec<u8>{
 
             // B-type: imm[12] | imm[10:5] | rs2[4:0] | rs1[4:0] | funct3[2:0] | imm[4:1] | imm[11] | opcode[6:0]
             Instruction::Btype {rs1, rs2, imm, opcode, funct3} => {
-                let ins_u32 = ((((imm & 0x1000) << 19) | ((imm & 0x07e0) << 19)) as u32) | (rs2 << 20) | (rs1 << 15) | (funct3 << 12) | ((((imm & 0x01e) << 7) | ((imm & 0x080) >> 4)) as u32) | opcode;
+                let ins_u32 = ((((imm & 0x1000) << 19) | ((imm & 0x07e0) << 20)) as u32) | (rs2 << 20) | (rs1 << 15) | (funct3 << 12) | ((((imm & 0x01e) << 7) | ((imm & 0x800) >> 4)) as u32) | opcode;
                 binary_contents.extend_from_slice(&ins_u32.to_le_bytes());
             },
 

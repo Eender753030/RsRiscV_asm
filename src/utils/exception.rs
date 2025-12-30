@@ -19,4 +19,7 @@ pub enum AsmRiscVError {
 
     #[error("")]
     ParseFunctError,
+
+    #[error("")]
+    UsedLabel,
 }
