@@ -65,7 +65,10 @@ pub fn parse_instruction(line: &str, table: &HashMap<String, i32>, ins_count: us
             op_str = left;
             args_str = right;
         },
-        None => return Err(AsmRiscVError::SyntaxError)
+        None => {
+            op_str = &last_line;
+            args_str = "";
+        }
     };
 
     let mut tokens = args_str.split(',');
@@ -248,7 +251,21 @@ pub fn parse_instruction(line: &str, table: &HashMap<String, i32>, ins_count: us
                 opcode: 0b1100111,
                 funct3: 0b000, 
             })
-        }
+        },
+
+        "ecall" | "ebreak" => {
+            Ok(Instruction::Itype { 
+                rd: 0,
+                rs1: 0,
+                imm: match op_str {
+                    "ecall" => 0,
+                    "ebreak" => 1,
+                    _ => return Err(AsmRiscVError::SyntaxError)
+                }, 
+                opcode: 0b1110011,
+                funct3: 0b000, 
+            })
+        },
 
         _ => {
             Err(AsmRiscVError::NotImplementedInstruction)

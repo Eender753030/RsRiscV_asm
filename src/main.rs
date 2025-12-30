@@ -21,7 +21,8 @@ fn main() {
         match file::read_asm(&arg) {
             Ok(content) => {
                 let mut label_table = HashMap::<String, i32>::new();
-                let content_iter = content.lines().filter(|s| !s.trim().starts_with('#') && !s.trim().is_empty());
+                let clean_content = content.replace(";", "\n");
+                let content_iter = clean_content.lines().filter(|s| !s.trim().starts_with('#') && !s.trim().is_empty());
                 for (i, line) in content_iter.clone().enumerate(){
                     let ins_line_num = i - label_table.len();
                     if let Err(e) = parser::parse_label(line, &mut label_table, ins_line_num) {     
