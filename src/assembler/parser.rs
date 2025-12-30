@@ -76,7 +76,7 @@ pub fn parse_instruction(line: &str, table: &HashMap<String, i32>, ins_count: us
             Ok(Instruction::Itype {
                 rd: parse_register(tokens.next())?,
                 rs1: parse_register(tokens.next())?,
-                imm: parse_immediate(tokens.next(), false)?,
+                imm: parse_immediate(tokens.next(), false, false)?,
                 opcode: 0b0010011, 
                 funct3: match op_str {
                     "addi" => 0b000,
@@ -98,7 +98,7 @@ pub fn parse_instruction(line: &str, table: &HashMap<String, i32>, ins_count: us
                     "slli" | "srli" => 0b000000,
                     "srai" => 0b0100000,
                     _ => return Err(AsmRiscVError::ParseFunctError)
-                } << 5) | (parse_immediate(tokens.next(), true)?),
+                } << 5) | (parse_immediate(tokens.next(), true, false)?),
                 opcode: 0b0010011, 
                 funct3: match op_str {
                     "slli" => 0b001,
@@ -218,6 +218,18 @@ pub fn parse_instruction(line: &str, table: &HashMap<String, i32>, ins_count: us
             })
         }
  
+        "lui" | "auipc" => {
+            Ok(Instruction::Utype {
+                rd: parse_register(tokens.next())?, 
+                imm: parse_immediate(tokens.next(), false, true)?, 
+                opcode: match op_str {
+                    "lui" => 0b0110111,
+                    "auipc" => 0b0010111,
+                    _ => return Err(AsmRiscVError::NotImplementedInstruction)
+                }
+            })
+        }
+
         "jal" => {
             Ok(Instruction::Jtype {
                 rd: parse_register(tokens.next())?,
@@ -266,7 +278,7 @@ fn parse_register(reg_token: Option<&str>) -> Result<u32, AsmRiscVError> {
     }
 }
 
-fn parse_immediate(imm_token: Option<&str>, with_funct: bool) -> Result<i32, AsmRiscVError> {
+fn parse_immediate(imm_token: Option<&str>, with_funct: bool, full_byte: bool) -> Result<i32, AsmRiscVError> {
     let imm_str = match imm_token {
         Some(token_str) => token_str.trim(),
         None => return Err(AsmRiscVError::SyntaxError)
@@ -281,7 +293,13 @@ fn parse_immediate(imm_token: Option<&str>, with_funct: bool) -> Result<i32, Asm
     
     let imm = if base != 10 {
         match u32::from_str_radix(&imm_str[2..], base) {
-            Ok(raw) => (raw as i32) << 20 >> 20,          
+            Ok(raw) => {
+                if with_funct || full_byte {
+                    raw as i32
+                } else {
+                    (raw as i32) << 20 >> 20    
+                }   
+            }
             Err(_) => return Err(AsmRiscVError::SyntaxError)
         }
     } else {
@@ -291,7 +309,9 @@ fn parse_immediate(imm_token: Option<&str>, with_funct: bool) -> Result<i32, Asm
         }
     };
 
-    if with_funct && !(0..=31).contains(&imm) || !(-2048..=2047).contains(&imm) {
+    if (full_byte && !(-2_i32.pow(19)..=2_i32.pow(19)-1).contains(&imm)) 
+        || (with_funct && !(0..=31).contains(&imm) 
+        || (!with_funct && !full_byte && !(-2048..=2047).contains(&imm))) {
         Err(AsmRiscVError::ImmediateOverflow)
     } else {
         Ok(imm)

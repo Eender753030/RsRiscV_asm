@@ -33,6 +33,12 @@ pub fn assembly(instructions: &Vec<Instruction>) -> Vec<u8>{
                 binary_contents.extend_from_slice(&ins_u32.to_le_bytes());
             },
 
+            // U-type: imm[31:12] | rd[4:0] | opcode[6:0]
+            Instruction::Utype {rd, imm, opcode} => {
+                let ins_u32 = (((imm & 0x000fffff) << 12) as u32) | (rd << 7) | opcode;
+                binary_contents.extend_from_slice(&ins_u32.to_le_bytes());
+            }
+
             // J-type: imm[20] | imm[10:1] | imm[11] | imm[19:12] | rd[4:0] | opcode[6:0]
             Instruction::Jtype {rd, imm, opcode} => {
                 let ins_u32 = ((((imm & 0x100000) << 11) | ((imm & 0x0007fe) << 20) | ((imm & 0x000800) << 9) | (imm & 0x0ff000)) as u32) | (rd << 7) | opcode;
