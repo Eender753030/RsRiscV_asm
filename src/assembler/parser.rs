@@ -1,35 +1,74 @@
 use super::instruction::Instruction;
 use crate::utils::exception::AsmRiscVError;
 
-pub fn parse_instruction(line: &str) -> Result<Instruction, AsmRiscVError> {
+use std::collections::HashMap;
+
+fn line_pre_process(line: &str) -> Result<String, AsmRiscVError> {
     let clean_line = line.trim();
     
     if clean_line.is_empty() {
         return Err(AsmRiscVError::ParseEmptyLine);
     }
 
-    let valid_line;
-
     if let Some(comment) = clean_line.find('#') {
-        valid_line = clean_line[..comment].to_lowercase();
+        let valid_line = clean_line[..comment].to_lowercase();
         if valid_line.is_empty() {
-            return Err(AsmRiscVError::ParseEmptyLine);
+            Err(AsmRiscVError::ParseEmptyLine)
+        } else {
+            Ok(valid_line)
         }
     } else {
-        valid_line = line.to_lowercase();
+        Ok(clean_line.to_lowercase())
     }
+}
+
+pub fn parse_label(line: &str, table: &mut HashMap<String, i32>, ins_line_num: usize) -> Result<(), AsmRiscVError> {
+    let valid_line = line_pre_process(line)?;
+    
+    match valid_line.split_once(':')  {
+        Some((label_str, _)) => {
+            let clean_label = label_str.trim();
+            if clean_label.contains(' ') || clean_label.as_bytes()[0].is_ascii_digit() {
+                return Err(AsmRiscVError::SyntaxError);
+            }
+            if table.contains_key(clean_label) {
+                return Err(AsmRiscVError::UsedLabel);
+            }
+            table.insert(clean_label.to_string(), ins_line_num as i32);
+            Ok(())
+        },
+        None => {
+            Err(AsmRiscVError::ParseEmptyLine)
+        }
+    }
+}
+
+pub fn parse_instruction(line: &str, table: &HashMap<String, i32>, ins_count: usize) -> Result<Instruction, AsmRiscVError> {
+    let valid_line = line_pre_process(line)?;
+
+    let last_line = match valid_line.split_once(':')  {
+        Some((_, right)) => {
+            if right.trim().is_empty() {
+                return Err(AsmRiscVError::ParseEmptyLine);
+            }
+            right.trim()
+        },
+        None => {
+            &valid_line
+        }
+    };
 
     let op_str;
-    let last_str;
-    match valid_line.split_once(' ') {
+    let args_str;
+    match last_line.split_once(' ') {
         Some((left, right)) => {
             op_str = left;
-            last_str = right;
+            args_str = right;
         },
         None => return Err(AsmRiscVError::SyntaxError)
     };
 
-    let mut tokens = last_str.split(',');
+    let mut tokens = args_str.split(',');
     
     match op_str {
         "addi" | "slti" | "sltiu" | 
@@ -125,7 +164,7 @@ pub fn parse_instruction(line: &str) -> Result<Instruction, AsmRiscVError> {
         "lb" | "lh" | "lw" | 
         "lbu" | "lhu" => {
             let rd = parse_register(tokens.next())?;
-            let (imm, rs1) = parse_ld_or_sd(tokens.next())?;
+            let (imm, rs1) = parse_parenthesis(tokens.next())?;
             Ok(Instruction::Itype {
                 rd,
                 rs1,
@@ -144,7 +183,7 @@ pub fn parse_instruction(line: &str) -> Result<Instruction, AsmRiscVError> {
 
         "sb" | "sh" | "sw" => {
             let rs2 = parse_register(tokens.next())?;
-            let (imm, rs1) = parse_ld_or_sd(tokens.next())?;
+            let (imm, rs1) = parse_parenthesis(tokens.next())?;
             Ok(Instruction::Stype {
                 rs2,
                 rs1,
@@ -159,6 +198,46 @@ pub fn parse_instruction(line: &str) -> Result<Instruction, AsmRiscVError> {
             })
         }
 
+        "beq" | "bne" | 
+        "blt" | "bge" | 
+        "bltu" | "bgeu" => {
+            Ok(Instruction::Btype { 
+                rs1: parse_register(tokens.next())?, 
+                rs2: parse_register(tokens.next())?, 
+                imm: parse_label_imm(tokens.next(), table, ins_count)?, 
+                opcode: 0b1100011, 
+                funct3: match op_str {
+                    "beq" => 0b000,
+                    "bne" => 0b001,
+                    "blt" => 0b100,
+                    "bge" => 0b101,
+                    "bltu" => 0b110,
+                    "bgeu" => 0b111,
+                    _ => return Err(AsmRiscVError::ParseFunctError)
+                }
+            })
+        }
+ 
+        "jal" => {
+            Ok(Instruction::Jtype {
+                rd: parse_register(tokens.next())?,
+                imm: parse_label_imm(tokens.next(), table, ins_count)?, 
+                opcode: 0b1101111 
+            })
+        },
+
+        "jalr" => {
+            let rd = parse_register(tokens.next())?;
+            let (imm, rs1) = parse_parenthesis(tokens.next())?;
+            Ok(Instruction::Itype { 
+                rd,
+                rs1,
+                imm, 
+                opcode: 0b1100111,
+                funct3: 0b000, 
+            })
+        }
+
         _ => {
             Err(AsmRiscVError::NotImplementedInstruction)
         }
@@ -167,7 +246,7 @@ pub fn parse_instruction(line: &str) -> Result<Instruction, AsmRiscVError> {
 
 fn parse_register(reg_token: Option<&str>) -> Result<u32, AsmRiscVError> {
     let reg_str = match reg_token {
-        Some(str) => str.trim(),
+        Some(token_str) => token_str.trim(),
         None => return Err(AsmRiscVError::SyntaxError)
     };
 
@@ -189,7 +268,7 @@ fn parse_register(reg_token: Option<&str>) -> Result<u32, AsmRiscVError> {
 
 fn parse_immediate(imm_token: Option<&str>, with_funct: bool) -> Result<i32, AsmRiscVError> {
     let imm_str = match imm_token {
-        Some(str) => str.trim(),
+        Some(token_str) => token_str.trim(),
         None => return Err(AsmRiscVError::SyntaxError)
     };
 
@@ -219,9 +298,9 @@ fn parse_immediate(imm_token: Option<&str>, with_funct: bool) -> Result<i32, Asm
     }
 }
 
-fn parse_ld_or_sd(token: Option<&str>) -> Result<(i32, u32), AsmRiscVError> {
+fn parse_parenthesis(token: Option<&str>) -> Result<(i32, u32), AsmRiscVError> {
     let token_str = match token {
-        Some(str) => str,
+        Some(token_str) => token_str.trim(),
         None => return Err(AsmRiscVError::SyntaxError)
     };
 
@@ -262,4 +341,32 @@ fn parse_ld_or_sd(token: Option<&str>) -> Result<(i32, u32), AsmRiscVError> {
         },
         Err(_) => return Err(AsmRiscVError::SyntaxError)
     }))
+}
+
+fn parse_label_imm(token: Option<&str>, table: &HashMap<String, i32>, ins_count: usize) -> Result<i32, AsmRiscVError>{
+    let label_str = match token {
+        Some(token_str) => token_str.trim(),
+        None => return Err(AsmRiscVError::SyntaxError)
+    };
+
+    let imm = match label_str.parse::<i32>() {
+        Ok(imm) => {      
+            imm >> 1 // For pc-relative addressing: pc = pc + offset * 2
+        },
+        Err(_) => {
+            let label = match table.get(&label_str.to_string()) {
+                Some(label) => label,
+                None => return Err(AsmRiscVError::SyntaxError)
+            };
+            // The `label - ins_count` is the line amount so need to * 2
+            // Also for pc-relative addressing: pc = pc + offset * 2
+            (*label - (ins_count as i32)) << 1
+        }
+    };
+
+    if !(-2_i32.pow(9)..2_i32.pow(9)-1).contains(&imm) {
+        Err(AsmRiscVError::ImmediateOverflow)
+    } else {
+        Ok(imm)
+    }
 }
