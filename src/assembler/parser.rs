@@ -164,7 +164,7 @@ pub fn parse_instruction(line: &str, table: &HashMap<String, i32>, ins_count: us
         "lb" | "lh" | "lw" | 
         "lbu" | "lhu" => {
             let rd = parse_register(tokens.next())?;
-            let (imm, rs1) = parse_ld_or_sd(tokens.next())?;
+            let (imm, rs1) = parse_parenthesis(tokens.next())?;
             Ok(Instruction::Itype {
                 rd,
                 rs1,
@@ -183,7 +183,7 @@ pub fn parse_instruction(line: &str, table: &HashMap<String, i32>, ins_count: us
 
         "sb" | "sh" | "sw" => {
             let rs2 = parse_register(tokens.next())?;
-            let (imm, rs1) = parse_ld_or_sd(tokens.next())?;
+            let (imm, rs1) = parse_parenthesis(tokens.next())?;
             Ok(Instruction::Stype {
                 rs2,
                 rs1,
@@ -223,6 +223,18 @@ pub fn parse_instruction(line: &str, table: &HashMap<String, i32>, ins_count: us
                 rd: parse_register(tokens.next())?,
                 imm: parse_label_imm(tokens.next(), table, ins_count)?, 
                 opcode: 0b1101111 
+            })
+        },
+
+        "jalr" => {
+            let rd = parse_register(tokens.next())?;
+            let (imm, rs1) = parse_parenthesis(tokens.next())?;
+            Ok(Instruction::Itype { 
+                rd,
+                rs1,
+                imm, 
+                opcode: 0b1100111,
+                funct3: 0b000, 
             })
         }
 
@@ -286,7 +298,7 @@ fn parse_immediate(imm_token: Option<&str>, with_funct: bool) -> Result<i32, Asm
     }
 }
 
-fn parse_ld_or_sd(token: Option<&str>) -> Result<(i32, u32), AsmRiscVError> {
+fn parse_parenthesis(token: Option<&str>) -> Result<(i32, u32), AsmRiscVError> {
     let token_str = match token {
         Some(token_str) => token_str.trim(),
         None => return Err(AsmRiscVError::SyntaxError)
